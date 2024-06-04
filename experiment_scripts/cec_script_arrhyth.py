@@ -10,6 +10,7 @@ runs = 10
 run_ids = [f"run_{i}" for i in range(0, runs)]
 
 # Feature Selection pipeline parameters
+min_features = 0
 max_features = 50
 feature_n_config = [x for x in range(0, max_features + 1)]
 cv_k = 5
@@ -18,11 +19,10 @@ cv_mode = "kfold"
 # NSGAII parameters
 cv_k = cv_k
 n_max = max_features
-n_gen = 200
-pop_size = 200
+n_gen = 10
+pop_size = 50
 fs_prob = 1.25
 evaluator_name = "linearsvm"  # "xgb"
-# fs_distrib = {"mrmr": 0.15, "relieff": 0.15, "kruskalwallis": 0.15, "mutualinfo": 0.15, "decisiontree": 0.15, "anovafvalue": 0.15, "randomforest": 0.15}#, "lassocv": 0.15}
 fs_distrib = {
     "mrmr": 0.125,
     "relieff": 0.125,
@@ -36,8 +36,12 @@ fs_distrib = {
 
 # Execution
 for pipeline in pipelines:
+
+    # Generate feature importances using the listed methods
     generate_features(pipeline, runs, run_ids)
+    # Evaluate baseline performances of the ranked feature importances using a list of feature counts (feature_n_config)
     eval_features(pipeline, run_ids, feature_n_config, cv_mode, cv_k)
+    # Run NSGA-II with the custom operators and the feature importances as input
     run_nsgaii(
         pipeline,
         run_ids,
@@ -49,7 +53,9 @@ for pipeline in pipelines:
         fs_prob,
         evaluator_name,
     )
+    # Assemble baseline performance results into a consolidated output
     assemble_fs_cv_results(pipeline, run_ids)
+    # Assemble MOGA optimization results into a consolidated output
     assemble_nsgaii_results(
         pipeline, run_ids, pop_size, n_gen, cv_k, n_max, fs_prob, evaluator_name
     )
