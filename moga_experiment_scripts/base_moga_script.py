@@ -32,6 +32,8 @@ class HFSExperiment:
         fs_prob,
         fs_distrib,
         fitness_evaluator_name,
+        fitness_evaluator_obj,
+        fitness_target_metric,
     ):
         self.pipeline = pipeline
         self.runs = runs
@@ -46,6 +48,8 @@ class HFSExperiment:
         self.fs_prob = fs_prob
         self.fs_distrib = fs_distrib
         self.fitness_evaluator_name = fitness_evaluator_name
+        self.fitness_evaluator_obj = fitness_evaluator_obj
+        self.fitness_target_metric = fitness_target_metric
 
         self.get_experiment_name()
 
@@ -54,21 +58,24 @@ class HFSExperiment:
 
         return self.experiment_name
 
-    def generate_features(self, duplicate_methods=None):
-        generate_features(self.pipeline, self.runs, self.run_ids, duplicate_methods=duplicate_methods)
+    def generate_baseline_features(self, duplicate_methods=None):
+        generate_baseline_features(
+            self.pipeline, self.runs, self.run_ids, duplicate_methods=duplicate_methods
+        )
 
-    def eval_features(self, target_metric, clfs):
-        eval_features(
+    def eval_baseline_features(self, target_metric, clfs):
+        eval_baseline_features(
             self.pipeline,
             self.run_ids,
             self.feature_n_config,
             self.cv_mode,
             self.cv_k,
             clfs,
+            target_metric,
         )
 
-    def run_nsgaii(self):
-        run_nsgaii(
+    def run_moga_optimization(self):
+        run_moga_optimization(
             self.pipeline,
             self.run_ids,
             self.pop_size,
@@ -78,15 +85,17 @@ class HFSExperiment:
             self.cv_k,
             self.fs_prob,
             self.fitness_evaluator_name,
+            self.fitness_evaluator_obj,
+            self.fitness_target_metric,
             self.experiment_name,
         )
 
-    def eval_nsgaii_features(self, target_metric, clfs):
+    def eval_moga_features(self, target_metric, clfs):
         front_paths, feature_set_paths = get_file_paths(
             self.pipeline, self.experiment_name, self.run_ids
         )
 
-        eval_nsgaii_features(
+        eval_moga_features(
             self.pipeline,
             target_metric,
             self.cv_k,
@@ -95,20 +104,21 @@ class HFSExperiment:
             feature_set_paths=feature_set_paths,
         )
 
-    def assemble_fs_cv_results(self):
-        assemble_fs_cv_results(self.pipeline, self.run_ids)
+    def assemble_baseline_cv_results(self):
+        assemble_baseline_cv_results(self.pipeline, self.run_ids)
 
-    def assemble_nsgaii_results(self):
+    def assemble_moga_fitness_results(self):
         front_paths, feature_set_paths = get_file_paths(
             self.pipeline, self.experiment_name, self.run_ids
         )
-                
-        assemble_nsgaii_results(self.pipeline, front_paths, self.experiment_name)
 
-    def assemble_nsgaii_evals(self):
-        assemble_nsgaii_evals(self.pipeline, self.experiment_name)
+        assemble_moga_fitness_results(self.pipeline, front_paths, self.experiment_name)
 
-def generate_features(pipeline, runs, run_ids, duplicate_methods=None):
+    def assemble_moga_evals(self):
+        assemble_moga_evals(self.pipeline, self.experiment_name)
+
+
+def generate_baseline_features(pipeline, runs, run_ids, duplicate_methods=None):
     X, y = pipeline.get_source_dfs()
 
     # Generate feature importances
@@ -131,7 +141,9 @@ def generate_features(pipeline, runs, run_ids, duplicate_methods=None):
                     shutil.copy(src, dst)
 
 
-def eval_features(pipeline, run_ids, feature_n_config, cv_mode, cv_k, clfs=None):
+def eval_baseline_features(
+    pipeline, run_ids, feature_n_config, cv_mode, cv_k, clfs=None, target_metric=None
+):
     # Evaluate datasets
     X, y = pipeline.get_source_dfs()
 
@@ -152,7 +164,7 @@ def eval_features(pipeline, run_ids, feature_n_config, cv_mode, cv_k, clfs=None)
         )
 
 
-def assemble_fs_cv_results(pipeline, run_ids):
+def assemble_baseline_cv_results(pipeline, run_ids):
     # Assemble all results into one dataset
     experiment_dfs = []
     for run_id in run_ids:
@@ -174,7 +186,7 @@ def assemble_fs_cv_results(pipeline, run_ids):
     )
 
 
-def run_nsgaii(
+def run_moga_optimization(
     pipeline,
     run_ids,
     pop_size,
@@ -184,6 +196,8 @@ def run_nsgaii(
     cv_k,
     prob_multiplier,
     evaluator_name,
+    evaluator_obj,
+    target_metric,
     experiment_name,
 ):
     ###############################################################
@@ -212,6 +226,8 @@ def run_nsgaii(
             cv_k,
             prob_multiplier,
             evaluator_name,
+            evaluator_obj,
+            target_metric,
             experiment_name,
         )
 
@@ -229,6 +245,8 @@ def run_nsgaii_iter(
     cv_k,
     prob_multiplier,
     evaluator_name,
+    evaluator_obj,
+    target_metric,
     experiment_name,
 ):
     # Load feature importances
@@ -247,7 +265,9 @@ def run_nsgaii_iter(
 
     logging.info(f"Creating problem for {run_id}")
     # Update reference feature_dfs
-    ma_problem = MicroarrayProblem(df, y, cv_k, n_max)
+    ma_problem = MicroarrayProblem(
+        df, y, cv_k, n_max, evaluator_name, evaluator_obj, target_metric
+    )
     ma_problem.feature_dfs = feature_dfs
     ma_problem.fs_distrib = fs_distrib
 
@@ -408,6 +428,7 @@ def eval_fronts_feature_sets(front_df, feature_list_df, X, y, clf=None, cv_k=5):
 
     return evaluations
 
+
 def get_target_from_front_evals(evals, target):
     metric = [(item["front_id"], np.mean(item["scores"][target])) for item in evals]
 
@@ -438,7 +459,7 @@ def evaluate(X_e, y_e, clf, cv_k):
     return scores
 
 
-def eval_nsgaii_features(
+def eval_moga_features(
     pipeline, target_metric, cv_k, clfs, front_paths, feature_set_paths
 ):
     X, y = pipeline.get_source_dfs()
@@ -517,8 +538,7 @@ def get_file_paths(pipeline, experiment_name, run_ids):
         return front_paths, feature_set_paths
 
 
-def assemble_nsgaii_results(pipeline, front_paths, experiment_name):
-
+def assemble_moga_fitness_results(pipeline, front_paths, experiment_name):
     dfs = []
     for ds in front_paths:
         df = pd.read_csv(ds)
@@ -542,8 +562,7 @@ def assemble_nsgaii_results(pipeline, front_paths, experiment_name):
     )
 
 
-def assemble_nsgaii_evals(pipeline, experiment_name):
-
+def assemble_moga_evals(pipeline, experiment_name):
     # Recover nsgaii eval results
     moga_cv_dfs = pd.read_csv(
         f"{pipeline.results_data_dir}/nsgaii_results/cv_results_assembled.csv"
@@ -556,9 +575,5 @@ def assemble_nsgaii_evals(pipeline, experiment_name):
 
     # Assemble all files into one huge report
     report_path = f"{pipeline.results_data_dir}/complete_evals_{experiment_name}.csv"
-    logging.info(
-        f"Saving final assembled results in {report_path}"
-    )
-    pd.concat([baseline_cv_dfs, moga_cv_dfs]).to_csv(
-        report_path
-    )
+    logging.info(f"Saving final assembled results in {report_path}")
+    pd.concat([baseline_cv_dfs, moga_cv_dfs]).to_csv(report_path)

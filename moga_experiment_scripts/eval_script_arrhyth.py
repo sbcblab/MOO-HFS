@@ -1,4 +1,5 @@
 from moga_experiment_scripts.base_moga_script import *
+from sklearn.svm import LinearSVC
 from xgboost import XGBClassifier
 import data_pipelines.arrhythmia_pipeline as arrhythmia_pipeline_
 
@@ -18,10 +19,18 @@ cv_mode = "kfold"
 # NSGAII parameters
 cv_k = cv_k
 n_max = max_features
-n_gen = 10
-pop_size = 50
+n_gen = 200
+pop_size = 200
 fs_prob = 1.25
-fitness_evaluator_name = "linearsvm"
+fitness_evaluator_name = (
+    "linearsvm"  # Internal evaluator name to record during the optimization process.
+)
+fitness_evaluator_obj = LinearSVC(
+    max_iter=3000, dual=True
+)  # Internal evaluator to use for the optimization process. Accepts the SKLearn predictor format.
+fitness_target_metric = "test_f1_macro"
+
+# Define the distribution of feature selection methods to be used in the optimization process. The sum of the values must be 1.
 fs_distrib = {
     "mrmr": 0.125,
     "relieff": 0.125,
@@ -32,6 +41,8 @@ fs_distrib = {
     "randomforest": 0.125,
     "lassocv": 0.125,
 }
+
+# Inform methods to replicate runs, if necessary (stochastic methods)
 duplicate_methods = [
     "kruskalwallis",
     "anovafvalue",
@@ -39,9 +50,9 @@ duplicate_methods = [
     "relieff",
     "mrmr",
 ]
-test_clfs = {
-    "xgb": XGBClassifier()
-}  # Define classifiers to evaluate final feature sets, as a dict. Ex.: {"my_clf": MyClassifier()}. If None, the default classifiers are used (LinearSVM).
+
+# Define classifiers to evaluate final feature sets, as a dict. Ex.: {"my_clf": MyClassifier()}. If None, the default classifiers are used (LinearSVM).
+test_clfs = {"xgb": XGBClassifier()}
 test_target_metric = "test_f1_macro"
 
 # Execution
@@ -59,18 +70,20 @@ experiment = HFSExperiment(
     fs_prob=fs_prob,
     fs_distrib=fs_distrib,
     fitness_evaluator_name=fitness_evaluator_name,
+    fitness_evaluator_obj=fitness_evaluator_obj,
+    fitness_target_metric=fitness_target_metric,
 )
-# Generate feature importances using the listed methods
-experiment.generate_features(duplicate_methods)
+# Generate feature importances using baseline methods
+experiment.generate_baseline_features(duplicate_methods)
 # Evaluate baseline performances of the ranked feature importances using a list of feature counts (feature_n_config)
-experiment.eval_features(test_target_metric, test_clfs)
+experiment.eval_baseline_features(test_target_metric, test_clfs)
 # Run NSGA-II with the custom operators and the feature importances as input
-experiment.run_nsgaii()
+experiment.run_moga_optimization()
 # Evaluate NSGA-II results with test classifiers
-experiment.eval_nsgaii_features(test_target_metric, test_clfs)
+experiment.eval_moga_features(test_target_metric, test_clfs)
 # Assemble baseline performance results into a consolidated output
-experiment.assemble_fs_cv_results()
+experiment.assemble_baseline_cv_results()
 # Assemble MOGA optimization results into a consolidated output (fitness results)
-experiment.assemble_nsgaii_results()
+experiment.assemble_moga_fitness_results()
 # Assemble MOGA evaluation results into a consolidated output
-experiment.assemble_nsgaii_evals()
+experiment.assemble_moga_evals()

@@ -1,6 +1,7 @@
 from moga_experiment_scripts.base_moga_script import *
-import data_pipelines.arrhythmia_pipeline as arrhythmia_pipeline_
+from sklearn.svm import LinearSVC
 from xgboost import XGBClassifier
+import data_pipelines.arrhythmia_pipeline as arrhythmia_pipeline_
 
 baseline_fs_pipeline = arrhythmia_pipeline_.get_pipeline("sample_run")
 
@@ -10,7 +11,7 @@ run_ids = [f"run_{i}" for i in range(0, runs)]
 
 # Feature Selection pipeline parameters
 min_features = 2
-max_features = 5
+max_features = 10
 feature_n_config = [x for x in range(0, max_features + 1)]
 cv_k = 5
 cv_mode = "kfold"
@@ -18,10 +19,12 @@ cv_mode = "kfold"
 # NSGAII parameters
 cv_k = cv_k  # Number of folds for cross-validation
 n_max = max_features  # Maximum number of features to consider
-n_gen = 10  # Number of generations
-pop_size = 15  # Population size
+n_gen = 50  # Number of generations
+pop_size = 30  # Population size
 fs_prob = 1.25  # Probability multiplier for the selection of a feature based on importance. Higher values decrease the influence of the importance value in the selection of a feature.
-fitness_evaluator_name = "linearsvm"  # Internal evaluator to use for the optimization process. Options.: "linearsvm", "decisiontree", "randomforest", "xgb".
+fitness_evaluator_name = "xgb"  # Internal evaluator name to record during the optimization process.
+fitness_evaluator_obj = XGBClassifier()  # Internal evaluator to use for the optimization process. Accepts the SKLearn predictor format.
+fitness_target_metric = "test_f1_macro"
 
 # Define the distribution of feature selection methods to be used in the optimization process. The sum of the values must be 1.
 fs_distrib = {
@@ -45,9 +48,7 @@ duplicate_methods = [
 ]
 
 # Define classifiers to evaluate final feature sets, as a dict. Ex.: {"my_clf": MyClassifier()}. If None, the default classifiers are used (LinearSVM).
-test_clfs = {
-    "xgb": XGBClassifier()
-} 
+test_clfs = {"xgb": XGBClassifier()}
 test_target_metric = "test_f1_macro"
 
 # Execution
@@ -65,18 +66,20 @@ experiment = HFSExperiment(
     fs_prob=fs_prob,
     fs_distrib=fs_distrib,
     fitness_evaluator_name=fitness_evaluator_name,
+    fitness_evaluator_obj=fitness_evaluator_obj,
+    fitness_target_metric=fitness_target_metric,
 )
-# Generate feature importances using the listed methods
-experiment.generate_features(duplicate_methods)
+# Generate feature importances using baseline methods
+experiment.generate_baseline_features(duplicate_methods)
 # Evaluate baseline performances of the ranked feature importances using a list of feature counts (feature_n_config)
-experiment.eval_features(test_target_metric, test_clfs)
+experiment.eval_baseline_features(test_target_metric, test_clfs)
 # Run NSGA-II with the custom operators and the feature importances as input
-experiment.run_nsgaii()
+experiment.run_moga_optimization()
 # Evaluate NSGA-II results with test classifiers
-experiment.eval_nsgaii_features(test_target_metric, test_clfs)
+experiment.eval_moga_features(test_target_metric, test_clfs)
 # Assemble baseline performance results into a consolidated output
-experiment.assemble_fs_cv_results()
+experiment.assemble_baseline_cv_results()
 # Assemble MOGA optimization results into a consolidated output (fitness results)
-experiment.assemble_nsgaii_results()
+experiment.assemble_moga_fitness_results()
 # Assemble MOGA evaluation results into a consolidated output
-experiment.assemble_nsgaii_evals()
+experiment.assemble_moga_evals()
