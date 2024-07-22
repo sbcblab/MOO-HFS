@@ -40,14 +40,16 @@ class GSEPipeline(FeatureGenerationPipeline):
     def transform(self):
         pass
 
-    def eval_baseline_df(self, mode="loo", k=5):
+    def eval_baseline_df(self, mode="loo", k=5, clfs=None):
         source_df, y_source_df = self.get_source_dfs()
 
         X_e, y_e, feature_names = self.prepare_dfs(X=source_df, y=y_source_df)
 
         output_file = f"{self.results_data_dir}/baseline_results/baseline_cv_scores_{mode}-cv_{k}-param.csv"
 
-        cvs = self.evaluate_df(X_e, y_e, output_file=output_file, mode=mode, k=k)
+        cvs = self.evaluate_df(
+            X_e, y_e, output_file=output_file, mode=mode, k=k, clfs=clfs
+        )
 
     def get_source_dfs(self):
         logging.info(f"Loading source data file from '{self.source_data_file}'")
@@ -125,8 +127,10 @@ class GSEPipeline(FeatureGenerationPipeline):
         run_id=None,
         mode="loo",
         k=5,
+        clfs=None,
     ):
-        clfs = self.get_eval_model()
+        if clfs is None:
+            clfs = self.get_eval_model()
 
         if mode == "loo":
             cv = LeaveOneOut()
@@ -201,6 +205,7 @@ class GSEPipeline(FeatureGenerationPipeline):
         k=10,
         output_suffix="cv_results",
         feature_n_config=[-1],
+        clfs=None,
     ):
         for feature_df in feature_dfs:
             for n in feature_n_config:
@@ -231,6 +236,7 @@ class GSEPipeline(FeatureGenerationPipeline):
                         run_id=run_id,
                         mode=cv_mode,
                         k=k,
+                        clfs=clfs,
                     )
                 except Exception as e:
                     logging.info(

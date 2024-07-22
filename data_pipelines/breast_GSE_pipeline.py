@@ -1,4 +1,4 @@
-from pipelines.gse_pipeline import GSEPipeline
+from data_pipelines.gse_pipeline import GSEPipeline
 
 
 def get_pipeline(experiment_id=None, root_dir=""):

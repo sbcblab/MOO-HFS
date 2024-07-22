@@ -1,5 +1,5 @@
 import pandas as pd
-from pipelines.gse_pipeline import GSEPipeline
+from data_pipelines.gse_pipeline import GSEPipeline
 
 
 class GencoveReducedPipeline(GSEPipeline):

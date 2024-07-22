@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from pipelines.gse_pipeline import GSEPipeline
+from data_pipelines.gse_pipeline import GSEPipeline
 import src.feature_generation_tools as fgtools
 
 
