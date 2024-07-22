@@ -1,20 +1,14 @@
 import os
-from pathlib import Path
 from time import time
 
 import pandas as pd
-import src.feature_selection_tools as selection
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (
     LeaveOneOut,
     LeavePOut,
     StratifiedKFold,
     cross_validate,
 )
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import LinearSVC
-from sklearn.tree import DecisionTreeClassifier
 from src.commons import *
 from src.feature_generation_pipeline import FeatureGenerationPipeline
 

@@ -128,7 +128,7 @@ def generate_features(pipeline, runs, run_ids, duplicate_methods=None):
                 for csv in csvs_to_replicate:
                     src = f"{pipeline.results_data_dir}/run_0/importances/{csv}"
                     dst = f"{pipeline.results_data_dir}/{run_id}/importances/{csv}"
-                shutil.copy(src, dst)
+                    shutil.copy(src, dst)
 
 
 def eval_features(pipeline, run_ids, feature_n_config, cv_mode, cv_k, clfs=None):
@@ -240,11 +240,10 @@ def run_nsgaii_iter(
 
     logging.info(f"Loading feature importance sets for {run_id}")
     feature_dfs = pipeline.get_selected_feature_dfs(run_id=run_id)
-    logging.info([filename for filename in feature_dfs])
+    logging.info(f"Files loaded: {[filename for filename in feature_dfs]}")
     feature_dfs = {
         filename.split("_")[0]: feature_dfs[filename] for filename in feature_dfs
     }
-    methods = [method for method in fs_distrib]
 
     logging.info(f"Creating problem for {run_id}")
     # Update reference feature_dfs

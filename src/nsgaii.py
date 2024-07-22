@@ -413,9 +413,6 @@ class FeatureSampling(Sampling):
         feature_dfs = {...}
         fs_distrib = {"mrmr": 0.2, "relieff": 0.2, "kruskalwallis": 0.2, "mutualinfo": 0.2, "decisiontree": 0.2}
         """
-        # feature_dfs = kwargs["feature_dfs"] Apparently kwargs doesn`t reach this point.... -_-
-        # fs_distrib = kwargs["fs_distrib"]
-
         feature_dfs = problem.feature_dfs
         fs_distrib = problem.fs_distrib
         methods = [method for method in fs_distrib]

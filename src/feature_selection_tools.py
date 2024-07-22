@@ -168,7 +168,7 @@ def generate_kruskalwallis_importances(X_e, y_e, feature_names, dst_path):
 
 
 def generate_mutualinfo_importances(X_e, y_e, feature_names, dst_path):
-    from sklearn.feature_selection import SelectKBest, mutual_info_classif
+    from sklearn.feature_selection import mutual_info_classif
 
     method = "mutualinfo"
 

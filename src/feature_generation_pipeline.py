@@ -113,7 +113,7 @@ class FeatureGenerationPipeline(ABC):
             else:
                 if run == 0 or enable_repeated:
                     logging.info(
-                        f"Running all methods for run {run+1}/{runs} and selecting {n} features."
+                        f"Running all methods for run {run+1}/{runs} and selecting {select} features."
                     )
                     selection.generate_n_importances(
                         X_e,
@@ -125,7 +125,7 @@ class FeatureGenerationPipeline(ABC):
                     )
                 else:
                     logging.info(
-                        f"Running only non-deterministic methods for run {run+1}/{runs} and selecting {n} features."
+                        f"Running only non-deterministic methods for run {run+1}/{runs} and selecting {select} features."
                     )
                     selection.generate_n_importances(
                         X_e,
