@@ -6,7 +6,6 @@ from warnings import simplefilter
 import math
 
 path_src = str(Path(os.getcwd(), "..").absolute())
-# sys.path.insert(0, path_src)
 sys.path.insert(0, "..")
 
 simplefilter(action="ignore", category=FutureWarning)
@@ -18,13 +17,10 @@ from sklearn.svm import LinearSVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import (
-    LeaveOneOut,
-    LeavePOut,
     StratifiedKFold,
     cross_validate,
 )
-
-# from xgboost import XGBClassifier
+from xgboost import XGBClassifier
 
 
 class MicroarrayProblem(ElementwiseProblem):
@@ -55,8 +51,8 @@ class MicroarrayProblem(ElementwiseProblem):
             clf = KNeighborsClassifier(n_neighbors=5)
         if self.evaluator_name == "decisiontree":
             clf = DecisionTreeClassifier()
-        # if self.evaluator_name == "xgb":
-        #    clf = XGBClassifier()
+        if self.evaluator_name == "xgb":
+            clf = XGBClassifier()
         cv = StratifiedKFold(n_splits=self.cv_k, shuffle=True)
         X_e = self.X_e[:, x]
         y_e = self.y_e
