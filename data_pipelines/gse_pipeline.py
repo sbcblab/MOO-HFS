@@ -105,15 +105,9 @@ class GSEPipeline(FeatureGenerationPipeline):
 
         return reduced_df
 
-    def get_eval_model(self, model="all"):
+    def get_eval_model(self):
         clfs = {}
-        # clfs["lassocv"] = LassoCV(random_state=42)
-        # clfs["decisiontree"] = DecisionTreeClassifier()#random_state=42)
-        # clfs["randomforest"] = RandomForestClassifier(n_estimators=150)#, random_state=42)
-        clfs["linearsvm"] = LinearSVC(max_iter=3000, dual=True)  # , random_state=42)
-        # clfs["logisticregression"] = LogisticRegression(max_iter=3000)#, random_state=42)
-        # clfs["knn"] = KNeighborsClassifier(n_neighbors=5)
-        # grid = {"n_neighbors": [5,15,25], "weights": ["uniform", "distance"]}
+        clfs["linearsvm"] = LinearSVC(max_iter=3000, dual=True)
 
         return clfs
 
