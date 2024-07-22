@@ -10,9 +10,103 @@ from src.nsgaii import (
     FeatureSamplingMutation,
 )
 from src.commons import *
+from sklearn.model_selection import (
+    StratifiedKFold,
+    cross_validate,
+)
 
 
-def generate_features(pipeline, runs, run_ids):
+class HFSExperiment:
+    def __init__(
+        self,
+        pipeline,
+        runs,
+        run_ids,
+        min_features,
+        feature_n_config,
+        max_features,
+        cv_mode,
+        cv_k,
+        n_gen,
+        pop_size,
+        fs_prob,
+        fs_distrib,
+        fitness_evaluator_name,
+        clfs,
+    ):
+        self.pipeline = pipeline
+        self.runs = runs
+        self.run_ids = run_ids
+        self.min_features = min_features
+        self.max_features = max_features
+        self.feature_n_config = feature_n_config
+        self.cv_mode = cv_mode
+        self.cv_k = cv_k
+        self.n_gen = n_gen
+        self.pop_size = pop_size
+        self.fs_prob = fs_prob
+        self.fs_distrib = fs_distrib
+        self.fitness_evaluator_name = fitness_evaluator_name
+        self.clfs = clfs
+
+        self.get_experiment_name()
+
+    def get_experiment_name(self):
+        self.experiment_name = f"""nsgaii_{self.pipeline.source_data_name}_{self.n_gen}-gens_{self.pop_size}-pop_{self.cv_k}-k_{self.min_features}-to-{self.max_features}-feat_{str(self.fs_prob).replace(".", "")}-prob_{self.fitness_evaluator_name}"""
+
+        return self.experiment_name
+
+    def run_all(self):
+        self.generate_features()
+        self.eval_features()
+        self.run_nsgaii()
+        self.assemble_fs_cv_results()
+        self.assemble_nsgaii_results()
+
+    def generate_features(self):
+        generate_features(self.pipeline, self.runs, self.run_ids)
+
+    def eval_features(self):
+        eval_features(
+            self.pipeline,
+            self.run_ids,
+            self.feature_n_config,
+            self.cv_mode,
+            self.cv_k,
+            self.clfs,
+        )
+
+    def run_nsgaii(self):
+        run_nsgaii(
+            self.pipeline,
+            self.run_ids,
+            self.pop_size,
+            self.n_gen,
+            self.fs_distrib,
+            self.max_features,
+            self.cv_k,
+            self.fs_prob,
+            self.fitness_evaluator_name,
+            self.experiment_name,
+        )
+
+    def assemble_fs_cv_results(self):
+        assemble_fs_cv_results(self.pipeline, self.run_ids)
+
+    def assemble_nsgaii_results(self):
+        assemble_nsgaii_results(
+            self.pipeline,
+            self.run_ids,
+            self.pop_size,
+            self.n_gen,
+            self.cv_k,
+            self.max_features,
+            self.fs_prob,
+            self.fitness_evaluator_name,
+        )
+
+
+def generate_features(pipeline, runs, run_ids, duplicate_methods=None):
     X, y = pipeline.get_source_dfs()
 
     # Generate feature importances
@@ -20,28 +114,22 @@ def generate_features(pipeline, runs, run_ids):
     pipeline.generate_feature_dfs(X, y, runs, select, enable_repeated=False)
 
     ## The following section is a workaround to not recalculating deterministic methods (which always yield the same results)
-    deterministic_methods = [
-        "kruskalwallis",
-        "anovafvalue",
-        "lassocv",
-        "relieff",
-        "mrmr",
-    ]
-
-    csvs_to_replicate = [
-        csv
-        for csv in os.listdir(f"{pipeline.results_data_dir}/run_0/importances")
-        if any([x in csv for x in deterministic_methods])
-    ]
-    for run_id in run_ids:
-        if run_id != "run_0":
-            for csv in csvs_to_replicate:
-                src = f"{pipeline.results_data_dir}/run_0/importances/{csv}"
-                dst = f"{pipeline.results_data_dir}/{run_id}/importances/{csv}"
+    if duplicate_methods is not None:
+        logging.info(f"Duplicating runs for methods {duplicate_methods}")
+        csvs_to_replicate = [
+            csv
+            for csv in os.listdir(f"{pipeline.results_data_dir}/run_0/importances")
+            if any([x in csv for x in duplicate_methods])
+        ]
+        for run_id in run_ids:
+            if run_id != "run_0":
+                for csv in csvs_to_replicate:
+                    src = f"{pipeline.results_data_dir}/run_0/importances/{csv}"
+                    dst = f"{pipeline.results_data_dir}/{run_id}/importances/{csv}"
                 shutil.copy(src, dst)
 
 
-def eval_features(pipeline, run_ids, feature_n_config, cv_mode, cv_k):
+def eval_features(pipeline, run_ids, feature_n_config, cv_mode, cv_k, clfs=None):
     # Evaluate datasets
     X, y = pipeline.get_source_dfs()
 
@@ -58,6 +146,7 @@ def eval_features(pipeline, run_ids, feature_n_config, cv_mode, cv_k):
             cv_mode=cv_mode,
             k=cv_k,
             feature_n_config=feature_n_config,
+            clfs=clfs,
         )
 
 
@@ -92,7 +181,8 @@ def run_nsgaii(
     n_max,
     cv_k,
     prob_multiplier,
-    evaluator_name="linearsvm",
+    evaluator_name,
+    experiment_name,
 ):
     ###############################################################
 
@@ -120,6 +210,7 @@ def run_nsgaii(
             cv_k,
             prob_multiplier,
             evaluator_name,
+            experiment_name,
         )
 
 
@@ -136,11 +227,11 @@ def run_nsgaii_iter(
     cv_k,
     prob_multiplier,
     evaluator_name,
+    experiment_name,
 ):
     # Load feature importances
-    output_suffix = f"""nsgaii_{pipeline.source_data_name}_{n_gen}-gens_{pop_size}-pop_{cv_k}-k_{n_max}-feat_{str(prob_multiplier).replace(".", "")}-prob_{evaluator_name}"""
     output_path = (
-        f"""{pipeline.results_data_dir}/{run_id}/nsgaii_solutions/{output_suffix}/"""
+        f"""{pipeline.results_data_dir}/{run_id}/nsgaii_solutions/{experiment_name}/"""
     )
 
     logging.info(f"Run results will be saved in {output_path}.")
@@ -161,14 +252,13 @@ def run_nsgaii_iter(
 
     # Define the algorithm
     from pymoo.algorithms.moo.nsga2 import NSGA2
-    from pymoo.operators.mutation.bitflip import BFM
     from pymoo.optimize import minimize
 
     algorithm = NSGA2(
         pop_size=pop_size,
         sampling=FeatureSampling(
             max_attempts=100, prob_multiplier=prob_multiplier, min_features=2
-        ),  # MySampling(),
+        ),
         crossover=BinaryCrossover(),
         mutation=FeatureSamplingMutation(),
         eliminate_duplicates=True,
@@ -180,7 +270,6 @@ def run_nsgaii_iter(
         ma_problem,
         algorithm,
         ("n_gen", n_gen),
-        # seed=1,
         verbose=True,
         save_history=True,
         evaluator_name=evaluator_name,
@@ -250,11 +339,11 @@ def run_nsgaii_iter(
     out_df["file"] = ""
     out_df["fs_method"] = f"NSGA-II_{n_gen}gen"
     out_df["fit_time"] = res.exec_time
-    out_df.to_csv(f"{output_path}/full_pop_{output_suffix}.csv")
+    out_df.to_csv(f"{output_path}/full_pop.csv")
 
     # Save full population features
     out_df = pd.DataFrame([indiv.X for indiv in res.pop], columns=feature_names)
-    out_df.to_csv(f"""{output_path}/feature_sets_{output_suffix}.csv""")
+    out_df.to_csv(f"""{output_path}/feature_sets.csv""")
 
     # Save front
     out_df = pd.DataFrame(F, columns=["test_f1_macro", "features"])
@@ -267,7 +356,7 @@ def run_nsgaii_iter(
     out_df["file"] = ""
     out_df["fs_method"] = f"NSGA-II_{n_gen}gen"
     out_df["fit_time"] = res.exec_time
-    out_df.to_csv(f"{output_path}/front_{output_suffix}.csv")
+    out_df.to_csv(f"{output_path}/front.csv")
 
     # Save all population scores in all generations
     full_pop_hist = [
@@ -288,45 +377,144 @@ def run_nsgaii_iter(
     out_df["file"] = ""
     out_df["fs_method"] = f"NSGA-II_{n_gen}gen"
     out_df["fit_time"] = res.exec_time
-    out_df.to_csv(f"{output_path}/full_pop_hist_{output_suffix}.csv")
+    out_df.to_csv(f"{output_path}/full_pop_hist.csv")
 
     # Save hypervolume
     hyperv_array = np.array([hv, n_evals]).T
 
     out_df = pd.DataFrame(hyperv_array, columns=["hypervolume", "n_evals"])
-    out_df.to_csv(f"{output_path}/hypervolume_{output_suffix}.csv")
+    out_df.to_csv(f"{output_path}/hypervolume.csv")
 
     return True
 
 
-def assemble_nsgaii_results(
-    pipeline, run_ids, pop_size, n_gen, cv_k, n_max, prob_multiplier, evaluator_name
-):
-    # Recover all files from NSGAII
-    # TODO: remove this expression
-    # subdir_iterators = [os.walk(f"{pipeline.results_data_dir}/{run_id}/nsgaii_solutions") for pipeline in pipelines for run_id in run_ids]
-    subdir_iterators = [
-        os.walk(f"{pipeline.results_data_dir}/{run_id}/nsgaii_solutions")
-        for run_id in run_ids
-    ]
-    subdir_files = [
-        os.path.join(dirpath, filename)
-        for subdir_iterator in subdir_iterators
-        for (dirpath, dirnames, filenames) in subdir_iterator
-        for filename in filenames
-    ]
-    expected_output_suffix = f"""front_nsgaii_{pipeline.source_data_name}_{n_gen}-gens_{pop_size}-pop_{cv_k}-k_{n_max}-feat_{str(prob_multiplier).replace(".", "")}-prob_{evaluator_name}"""
-    logging.info(f"Looking for files with suffix: {expected_output_suffix}.")
+def eval_fronts_feature_sets(front_df, feature_list_df, X, y, clf=None, cv_k=5):
+    evaluations = []
 
-    datasets = [
-        subdir_file
-        for subdir_file in subdir_files
-        if (expected_output_suffix in subdir_file)
+    for front_id in front_df.index:
+        feature_list = (
+            feature_list_df.loc[front_id]
+            .where(feature_list_df.loc[front_id] == True)
+            .dropna()
+            .index
+        )
+
+        X_selected = X[feature_list].copy()
+        y = y
+
+        scores = evaluate(X_selected, y, clf, cv_k)
+        evaluations.append({"front_id": front_id, "scores": scores})
+
+    return evaluations
+
+
+def get_target_from_front_evals(evals, target):
+    metric = [(item["front_id"], np.mean(item["scores"][target])) for item in evals]
+
+    return metric
+
+
+def evaluate(X_e, y_e, clf, cv_k):
+    cv = StratifiedKFold(n_splits=cv_k, shuffle=True)
+
+    scores = cross_validate(
+        clf,
+        X_e,
+        y_e,
+        cv=cv,
+        scoring=[
+            "f1_micro",
+            "f1_macro",
+            "f1_weighted",
+            "recall_micro",
+            "recall_macro",
+            "recall_weighted",
+            "accuracy",
+        ],
+        return_estimator=False,
+        n_jobs=-1,
+    )
+
+    return scores
+
+
+def eval_nsgaii_features(
+    pipeline, target_metric, cv_k, clfs=None, front_paths=None, feature_set_paths=None
+):
+    X, y = pipeline.get_source_dfs()
+
+    front_dfs = [pd.read_csv(front_path, index_col=0) for front_path in front_paths]
+    feature_set_dfs = [
+        pd.read_csv(feature_set_path, index_col=0)
+        for feature_set_path in feature_set_paths
     ]
-    logging.info(f"Recovering all front files: {datasets}.")
+    new_front_dfs = []
+
+    X_e, y_e, feature_names = pipeline.prepare_dfs(X=X, y=y, save=False)
+    df = pd.DataFrame(X_e, columns=feature_names, index=X.index)
+
+    for clf_name, clf in clfs.items():
+        for front_df, feature_list_df in zip(front_dfs, feature_set_dfs):
+            evals = eval_fronts_feature_sets(
+                front_df, feature_list_df, df, y_e, clf, cv_k
+            )
+            scores = get_target_from_front_evals(evals, target_metric)
+
+            target_metrics_df = pd.DataFrame(
+                scores, columns=["front_id", target_metric]
+            )
+            target_metrics_df["model"] = clf_name
+
+            front_df[target_metric] = target_metrics_df[target_metric]
+            front_df["model"] = clf_name
+            new_front_dfs.append(front_df)
+
+    return pd.concat(new_front_dfs)
+
+
+def get_file_paths(pipeline, experiment_name, run_ids):
+    for run_id in run_ids:
+        subdir_iterators = [
+            os.walk(
+                f"{pipeline.results_data_dir}/{run_id}/nsgaii_solutions/{experiment_name}"
+            )
+            for run_id in run_ids
+        ]
+        subdir_files = [
+            os.path.join(dirpath, filename)
+            for subdir_iterator in subdir_iterators
+            for (dirpath, dirnames, filenames) in subdir_iterator
+            for filename in filenames
+        ]
+
+        expected_dir_name = "front_nsgaii"
+        logging.info(f"Looking for files with prefix: {expected_dir_name}.")
+
+        front_paths = [
+            subdir_file
+            for subdir_file in subdir_files
+            if (expected_dir_name in subdir_file)
+        ]
+        logging.info(f"Recovering all front files: {front_paths}.")
+
+        expected_dir_name = "feature_sets"
+        logging.info(f"Looking for files with suffix: {expected_dir_name}.")
+
+        feature_set_paths = [
+            subdir_file
+            for subdir_file in subdir_files
+            if (expected_dir_name in subdir_file)
+        ]
+        logging.info(f"Recovering all front files: {feature_set_paths}.")
+
+        return front_paths, feature_set_paths
+
+
+def assemble_nsgaii_results(pipeline, front_paths, run_ids, experiment_name):
+    front_paths, feature_set_paths = get_file_paths(pipeline, experiment_name, run_ids)
 
     dfs = []
-    for ds in datasets:
+    for ds in front_paths:
         df = pd.read_csv(ds)
         dfs.append(df)
 
@@ -341,13 +529,9 @@ def assemble_nsgaii_results(
     )
 
     # Assemble all files into one huge report
-    # logging.info("Saving final assembled results in ", f"./results/front_assembled_extended_{n_gen}gens_{cv_k}k_{n_max}feat.csv")
-    # pd.concat([other_cv_dfs, dfs]).to_csv(f"./results/front_assembled_extended_{n_gen}gens_{cv_k}k_{n_max}feat.csv")
-    output_suffix = f"""nsgaii_{pipeline.source_data_name}_{n_gen}-gens_{pop_size}-pop_{cv_k}-k_{n_max}-feat_{str(prob_multiplier).replace(".", "")}-prob_{evaluator_name}_{len(run_ids)}-runs"""
-
     logging.info(
-        f"Saving final assembled results in {pipeline.results_data_dir}/front_assembled_extended_{output_suffix}.csv"
+        f"Saving final assembled results in {pipeline.results_data_dir}/front_assembled_extended_{experiment_name}.csv"
     )
     pd.concat([other_cv_dfs, dfs]).to_csv(
-        f"{pipeline.results_data_dir}/front_assembled_extended_{output_suffix}.csv"
+        f"{pipeline.results_data_dir}/front_assembled_extended_{experiment_name}.csv"
     )

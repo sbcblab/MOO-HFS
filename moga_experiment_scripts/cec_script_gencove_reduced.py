@@ -1,5 +1,5 @@
-from cec_script import *
-import pipelines.gencove_reduced_pipeline as gencove_pipeline_
+from experiment_scripts.base_moga_script import *
+import data_pipelines.gencove_reduced_pipeline as gencove_pipeline_
 
 pipelines = [
     gencove_pipeline_.get_pipeline("cec_shuffled"),
