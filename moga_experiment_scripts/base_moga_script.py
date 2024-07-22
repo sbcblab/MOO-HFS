@@ -23,8 +23,8 @@ class HFSExperiment:
         runs,
         run_ids,
         min_features,
-        feature_n_config,
         max_features,
+        feature_n_config,
         cv_mode,
         cv_k,
         n_gen,
@@ -32,7 +32,6 @@ class HFSExperiment:
         fs_prob,
         fs_distrib,
         fitness_evaluator_name,
-        clfs,
     ):
         self.pipeline = pipeline
         self.runs = runs
@@ -47,7 +46,6 @@ class HFSExperiment:
         self.fs_prob = fs_prob
         self.fs_distrib = fs_distrib
         self.fitness_evaluator_name = fitness_evaluator_name
-        self.clfs = clfs
 
         self.get_experiment_name()
 
@@ -56,24 +54,17 @@ class HFSExperiment:
 
         return self.experiment_name
 
-    def run_all(self):
-        self.generate_features()
-        self.eval_features()
-        self.run_nsgaii()
-        self.assemble_fs_cv_results()
-        self.assemble_nsgaii_results()
+    def generate_features(self, duplicate_methods=None):
+        generate_features(self.pipeline, self.runs, self.run_ids, duplicate_methods=duplicate_methods)
 
-    def generate_features(self):
-        generate_features(self.pipeline, self.runs, self.run_ids)
-
-    def eval_features(self):
+    def eval_features(self, clfs):
         eval_features(
             self.pipeline,
             self.run_ids,
             self.feature_n_config,
             self.cv_mode,
             self.cv_k,
-            self.clfs,
+            clfs,
         )
 
     def run_nsgaii(self):
@@ -90,21 +81,32 @@ class HFSExperiment:
             self.experiment_name,
         )
 
+    def eval_nsgaii_features(self, target_metric, clfs):
+        front_paths, feature_set_paths = get_file_paths(
+            self.pipeline, self.experiment_name, self.run_ids
+        )
+
+        eval_nsgaii_features(
+            self.pipeline,
+            target_metric,
+            self.cv_k,
+            clfs=clfs,
+            front_paths=front_paths,
+            feature_set_paths=feature_set_paths,
+        )
+
     def assemble_fs_cv_results(self):
         assemble_fs_cv_results(self.pipeline, self.run_ids)
 
     def assemble_nsgaii_results(self):
-        assemble_nsgaii_results(
-            self.pipeline,
-            self.run_ids,
-            self.pop_size,
-            self.n_gen,
-            self.cv_k,
-            self.max_features,
-            self.fs_prob,
-            self.fitness_evaluator_name,
+        front_paths, feature_set_paths = get_file_paths(
+            self.pipeline, self.experiment_name, self.run_ids
         )
+                
+        assemble_nsgaii_results(self.pipeline, front_paths, self.run_ids, self.experiment_name)
 
+    def assemble_nsgaii_evals(self):
+        assemble_nsgaii_evals(self.pipeline, self.experiment_name)
 
 def generate_features(pipeline, runs, run_ids, duplicate_methods=None):
     X, y = pipeline.get_source_dfs()
@@ -407,7 +409,6 @@ def eval_fronts_feature_sets(front_df, feature_list_df, X, y, clf=None, cv_k=5):
 
     return evaluations
 
-
 def get_target_from_front_evals(evals, target):
     metric = [(item["front_id"], np.mean(item["scores"][target])) for item in evals]
 
@@ -469,7 +470,14 @@ def eval_nsgaii_features(
             front_df["model"] = clf_name
             new_front_dfs.append(front_df)
 
-    return pd.concat(new_front_dfs)
+    front_evals_df = pd.concat(new_front_dfs)
+
+    # Store results
+    if not os.path.exists(f"""{pipeline.results_data_dir}/nsgaii_results/"""):
+        os.makedirs(f"""{pipeline.results_data_dir}/nsgaii_results/""")
+    front_evals_df.to_csv(
+        f"""{pipeline.results_data_dir}/nsgaii_results/cv_results_assembled.csv"""
+    )
 
 
 def get_file_paths(pipeline, experiment_name, run_ids):
@@ -510,8 +518,7 @@ def get_file_paths(pipeline, experiment_name, run_ids):
         return front_paths, feature_set_paths
 
 
-def assemble_nsgaii_results(pipeline, front_paths, run_ids, experiment_name):
-    front_paths, feature_set_paths = get_file_paths(pipeline, experiment_name, run_ids)
+def assemble_nsgaii_results(pipeline, front_paths, experiment_name):
 
     dfs = []
     for ds in front_paths:
@@ -523,7 +530,6 @@ def assemble_nsgaii_results(pipeline, front_paths, run_ids, experiment_name):
     dfs["test_f1_macro"] = 1 - dfs["test_f1_macro"]
 
     # Recover all files from pipelines
-    # other_cv_dfs = pd.concat([pd.read_csv(f"{pipeline.results_data_dir}/baseline_results/cv_results_assembled.csv") for pipeline in [pipeline]])
     other_cv_dfs = pd.read_csv(
         f"{pipeline.results_data_dir}/baseline_results/cv_results_assembled.csv"
     )
@@ -534,4 +540,26 @@ def assemble_nsgaii_results(pipeline, front_paths, run_ids, experiment_name):
     )
     pd.concat([other_cv_dfs, dfs]).to_csv(
         f"{pipeline.results_data_dir}/front_assembled_extended_{experiment_name}.csv"
+    )
+
+
+def assemble_nsgaii_evals(pipeline, experiment_name):
+
+    # Recover nsgaii eval results
+    moga_cv_dfs = pd.read_csv(
+        f"{pipeline.results_data_dir}/nsgaii_results/cv_results_assembled.csv"
+    )
+
+    # Recover baseline results
+    baseline_cv_dfs = pd.read_csv(
+        f"{pipeline.results_data_dir}/baseline_results/cv_results_assembled.csv"
+    )
+
+    # Assemble all files into one huge report
+    report_path = f"{pipeline.results_data_dir}/complete_evals_{experiment_name}.csv"
+    logging.info(
+        f"Saving final assembled results in {report_path}"
+    )
+    pd.concat([baseline_cv_dfs, moga_cv_dfs]).to_csv(
+        report_path
     )

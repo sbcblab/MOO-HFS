@@ -1,4 +1,4 @@
-from experiment_scripts.base_moga_script import *
+from moga_experiment_scripts.base_moga_script import *
 from xgboost import XGBClassifier
 import data_pipelines.breast_gse_pipeline as breast_gse_pipeline_
 

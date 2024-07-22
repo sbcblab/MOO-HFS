@@ -1,4 +1,4 @@
-from experiment_scripts.base_moga_script import *
+from moga_experiment_scripts.base_moga_script import *
 from xgboost import XGBClassifier
 import data_pipelines.leukemia_gse_pipeline as leukemia_gse_pipeline_
 

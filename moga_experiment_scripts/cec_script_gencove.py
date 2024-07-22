@@ -1,4 +1,4 @@
-from experiment_scripts.base_moga_script import *
+from moga_experiment_scripts.base_moga_script import *
 from xgboost import XGBClassifier
 import data_pipelines.gencove_pipeline as gencove_pipeline_
 
