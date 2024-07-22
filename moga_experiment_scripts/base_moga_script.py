@@ -57,7 +57,7 @@ class HFSExperiment:
     def generate_features(self, duplicate_methods=None):
         generate_features(self.pipeline, self.runs, self.run_ids, duplicate_methods=duplicate_methods)
 
-    def eval_features(self, clfs):
+    def eval_features(self, target_metric, clfs):
         eval_features(
             self.pipeline,
             self.run_ids,
@@ -103,7 +103,7 @@ class HFSExperiment:
             self.pipeline, self.experiment_name, self.run_ids
         )
                 
-        assemble_nsgaii_results(self.pipeline, front_paths, self.run_ids, self.experiment_name)
+        assemble_nsgaii_results(self.pipeline, front_paths, self.experiment_name)
 
     def assemble_nsgaii_evals(self):
         assemble_nsgaii_evals(self.pipeline, self.experiment_name)
@@ -439,7 +439,7 @@ def evaluate(X_e, y_e, clf, cv_k):
 
 
 def eval_nsgaii_features(
-    pipeline, target_metric, cv_k, clfs=None, front_paths=None, feature_set_paths=None
+    pipeline, target_metric, cv_k, clfs, front_paths, feature_set_paths
 ):
     X, y = pipeline.get_source_dfs()
 
@@ -494,7 +494,7 @@ def get_file_paths(pipeline, experiment_name, run_ids):
             for filename in filenames
         ]
 
-        expected_dir_name = "front_nsgaii"
+        expected_dir_name = "front"
         logging.info(f"Looking for files with prefix: {expected_dir_name}.")
 
         front_paths = [

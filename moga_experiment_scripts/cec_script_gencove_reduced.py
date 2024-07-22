@@ -21,7 +21,7 @@ n_max = max_features
 n_gen = 10
 pop_size = 50
 fs_prob = 1.25
-evaluator_name = "linearsvm"  # "xgb"
+fitness_evaluator_name = "linearsvm"  # "xgb"
 # fs_distrib = {"mrmr": 0.15, "relieff": 0.15, "kruskalwallis": 0.15, "mutualinfo": 0.15, "decisiontree": 0.15, "anovafvalue": 0.15, "randomforest": 0.15}#, "lassocv": 0.15}
 fs_distrib = {
     "mrmr": 0.125,

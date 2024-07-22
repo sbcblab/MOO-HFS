@@ -47,7 +47,8 @@ duplicate_methods = [
 # Define classifiers to evaluate final feature sets, as a dict. Ex.: {"my_clf": MyClassifier()}. If None, the default classifiers are used (LinearSVM).
 test_clfs = {
     "xgb": XGBClassifier()
-}  
+} 
+test_target_metric = "test_f1_macro"
 
 # Execution
 experiment = HFSExperiment(
@@ -68,11 +69,11 @@ experiment = HFSExperiment(
 # Generate feature importances using the listed methods
 experiment.generate_features(duplicate_methods)
 # Evaluate baseline performances of the ranked feature importances using a list of feature counts (feature_n_config)
-experiment.eval_features(test_clfs)
+experiment.eval_features(test_target_metric, test_clfs)
 # Run NSGA-II with the custom operators and the feature importances as input
 experiment.run_nsgaii()
 # Evaluate NSGA-II results with test classifiers
-experiment.eval_nsgaii_features(test_clfs)
+experiment.eval_nsgaii_features(test_target_metric, test_clfs)
 # Assemble baseline performance results into a consolidated output
 experiment.assemble_fs_cv_results()
 # Assemble MOGA optimization results into a consolidated output (fitness results)
