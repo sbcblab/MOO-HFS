@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from warnings import simplefilter
 import math
+from copy import copy
 
 path_src = str(Path(os.getcwd(), "..").absolute())
 sys.path.insert(0, "..")
@@ -37,7 +38,7 @@ class MicroarrayProblem(ElementwiseProblem):
         self.n_max = n_max
         self.df = df
         self.X_e = df.to_numpy()
-        self.y_e = y.to_numpy()
+        self.y_e = y
         self.cv_k = cv_k
         self.fitness_evaluator_name = fitness_evaluator_name
         self.fitness_evaluator_obj = fitness_evaluator_obj
@@ -49,7 +50,7 @@ class MicroarrayProblem(ElementwiseProblem):
         y_e = self.y_e
 
         scores = cross_validate(
-            self.fitness_evaluator_obj,
+            copy(self.fitness_evaluator_obj),
             X_e,
             y_e.ravel(),
             cv=cv,

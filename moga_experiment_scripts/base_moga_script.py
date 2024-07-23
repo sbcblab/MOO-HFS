@@ -216,7 +216,7 @@ def run_moga_optimization(
         run_nsgaii_iter(
             pipeline,
             df,
-            y,
+            y_e,
             feature_names,
             run_id,
             pop_size,

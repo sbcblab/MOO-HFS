@@ -6,12 +6,12 @@ import data_pipelines.arrhythmia_pipeline as arrhythmia_pipeline_
 baseline_fs_pipeline = arrhythmia_pipeline_.get_pipeline("sample_run")
 
 # Experiment configs
-runs = 2
+runs = 1
 run_ids = [f"run_{i}" for i in range(0, runs)]
 
 # Feature Selection pipeline parameters
 min_features = 2
-max_features = 10
+max_features = 30
 feature_n_config = [x for x in range(0, max_features + 1)]
 cv_k = 5
 cv_mode = "kfold"
@@ -20,7 +20,7 @@ cv_mode = "kfold"
 cv_k = cv_k  # Number of folds for cross-validation
 n_max = max_features  # Maximum number of features to consider
 n_gen = 50  # Number of generations
-pop_size = 30  # Population size
+pop_size = 50  # Population size
 fs_prob = 1.25  # Probability multiplier for the selection of a feature based on importance. Higher values decrease the influence of the importance value in the selection of a feature.
 fitness_evaluator_name = "xgb"  # Internal evaluator name to record during the optimization process.
 fitness_evaluator_obj = XGBClassifier()  # Internal evaluator to use for the optimization process. Accepts the SKLearn predictor format.
